@@ -1,408 +1,333 @@
 import string
-import nltk
-from nltk.corpus import stopwords
 import os
-import networkx as nx
-import matplotlib.pyplot as plt
 from collections import Counter
 
-# Descargar los recursos necesarios de NLTK (solo la primera vez)
+import nltk
+from nltk.corpus import stopwords
+import networkx as nx
+import matplotlib.pyplot as plt
+
+# Download necessary NLTK resources (only the first time)
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
 
 
-def obtener_vocabulario_con_cuentas(filename, eliminar_stopwords=False):
+def extract_vocabulary(filename, remove_stopwords=True):
     """
-    Extrae el vocabulario de palabras de tres letras de un archivo de texto y cuenta sus apariciones.
+    Extract a vocabulary of three-letter words from a text file and count their occurrences.
 
     Args:
-        filename (str): Ruta al archivo de texto.
-        eliminar_stopwords (bool): Si True, elimina las palabras comunes (stop words).
+        filename (str): Path to the text file.
+        remove_stopwords (bool): Whether to remove English stopwords.
 
     Returns:
-        dict: Diccionario donde las llaves son palabras de tres letras y los valores son sus cuentas.
+        Counter: A Counter object with three-letter words as keys and their occurrences as values.
     """
-    # Verificar si el archivo existe
     if not os.path.isfile(filename):
-        print(f"Error: El archivo '{filename}' no se encuentra.")
-        print(f"Ruta absoluta: {os.path.abspath(filename)}")
-        return {}
+        print(f"Error: The file '{filename}' does not exist.")
+        return Counter()
 
     try:
-        # Leer el contenido del archivo con una codificación específica
         with open(filename, 'r', encoding='utf-8') as file:
-            texto = file.read()
+            text = file.read()
     except UnicodeDecodeError:
-        print("Error de decodificación con 'utf-8'. Intentando con 'latin-1'.")
         try:
             with open(filename, 'r', encoding='latin-1') as file:
-                texto = file.read()
+                text = file.read()
         except Exception as e:
-            print(f"Error al leer el archivo con 'latin-1': {e}")
-            return {}
+            print(f"Error: Unable to read the file: {e}")
+            return Counter()
     except Exception as e:
-        print(f"Error al leer el archivo: {e}")
-        return {}
+        print(f"Error: Unable to read the file: {e}")
+        return Counter()
 
-    # Convertir texto a minúsculas
-    texto = texto.lower()
+    text = text.lower()
+    text = ''.join(char if char.isalpha() or char.isspace() else ' ' for char in text)
+    words = nltk.word_tokenize(text)
+    three_letter_words = [word for word in words if len(word) == 3]
 
-    # Eliminar signos de puntuación y otros caracteres no alfabéticos
-    texto = ''.join([char if char.isalpha() or char.isspace() else ' ' for char in texto])
-
-    # Tokenizar el texto
-    palabras = nltk.word_tokenize(texto)
-
-    # Filtrar palabras de tres letras
-    palabras_tres_letras = [palabra for palabra in palabras if len(palabra) == 3]
-
-    if eliminar_stopwords:
-        # Obtener la lista de stop words en inglés
+    if remove_stopwords:
         stop_words = set(stopwords.words('english'))
-        # Eliminar stop words
-        palabras_tres_letras = [palabra for palabra in palabras_tres_letras if palabra not in stop_words]
+        three_letter_words = [word for word in three_letter_words if word not in stop_words]
 
-    # Contar las apariciones de cada palabra
-    contador = Counter(palabras_tres_letras)
-
-    return contador
+    return Counter(three_letter_words)
 
 
-def difiere_por_una_letra(palabra1, palabra2):
+def differ_by_one_letter(word_a, word_b):
     """
-    Verifica si dos palabras de tres letras difieren en exactamente una letra.
+    Check if two three-letter words differ by exactly one letter.
 
     Args:
-        palabra1 (str): Primera palabra.
-        palabra2 (str): Segunda palabra.
+        word_a (str): First three-letter word.
+        word_b (str): Second three-letter word.
 
     Returns:
-        bool: True si difieren en una letra, False de lo contrario.
+        bool: True if they differ by one letter, False otherwise.
     """
-    diferencias = sum(1 for a, b in zip(palabra1, palabra2) if a != b)
-    return diferencias == 1
+    differing_letters = sum(1 for a, b in zip(word_a, word_b) if a != b)
+    return differing_letters == 1
 
 
-def construir_grafo_con_pesos(contador_palabras):
+def build_weight_graph(word_counts):
     """
-    Construye un grafo donde cada nodo es una palabra y las aristas conectan palabras que difieren en una letra.
-    Los pesos de las aristas se basan en las cuentas de las palabras conectadas.
+    Build an optimized graph where nodes are words and edges connect words that differ by one letter.
+    Edge weights are based on the average occurrences of the connected words.
+
+    This method reduces time complexity by grouping words by common patterns.
 
     Args:
-        contador_palabras (dict): Diccionario con palabras como llaves y sus cuentas como valores.
+        word_counts (Counter): Counter with words as keys and their occurrences as values.
 
     Returns:
-        networkx.Graph: El grafo construido con pesos en las aristas.
+        nx.Graph: The constructed graph with weighted edges.
     """
-    G = nx.Graph()
+    graph = nx.Graph()
 
-    # Añadir nodos con atributo de cuenta
-    for palabra, cuenta in contador_palabras.items():
-        G.add_node(palabra, cuenta=cuenta)
+    # Add nodes with occurrence attribute
+    for word, count in word_counts.items():
+        graph.add_node(word, count=count)
 
-    # Convertir las palabras a una lista para iterar con índices
-    palabras = list(contador_palabras.keys())
-    n = len(palabras)
-
-    # Añadir aristas con pesos
-    for i in range(n):
-        for j in range(i + 1, n):
-            palabra1 = palabras[i]
-            palabra2 = palabras[j]
-            if difiere_por_una_letra(palabra1, palabra2):
-                cuenta1 = contador_palabras[palabra1]
-                cuenta2 = contador_palabras[palabra2]
-                peso = (cuenta1 + cuenta2) / 2
-                G.add_edge(palabra1, palabra2, peso=peso)
-
-    return G
-
-
-def construir_grafo_con_pesos_optimizado(contador_palabras):
-    """
-    Construye un grafo optimizado donde cada nodo es una palabra y las aristas conectan palabras que difieren en una letra.
-    Los pesos de las aristas se basan en las cuentas de las palabras conectadas.
-
-    Utiliza un método optimizado para reducir la complejidad temporal.
-
-    Args:
-        contador_palabras (dict): Diccionario con palabras como llaves y sus cuentas como valores.
-
-    Returns:
-        networkx.Graph: El grafo construido con pesos en las aristas.
-    """
-    G = nx.Graph()
-
-    # Añadir nodos con atributo de cuenta
-    for palabra, cuenta in contador_palabras.items():
-        G.add_node(palabra, cuenta=cuenta)
-
-    # Crear un diccionario para agrupar palabras por patrones
-    patrones = {}
-    for palabra in contador_palabras:
+    # Create a dictionary to group words by patterns with one letter replaced by '_'
+    patterns = {}
+    for word in word_counts:
         for i in range(3):
-            patron = palabra[:i] + '_' + palabra[i + 1:]
-            patrones.setdefault(patron, set()).add(palabra)
+            pattern = word[:i] + '_' + word[i + 1:]
+            patterns.setdefault(pattern, set()).add(word)
 
-    # Añadir aristas basadas en patrones
-    for grupo in patrones.values():
-        grupo = list(grupo)
-        n = len(grupo)
+    # Add edges based on shared patterns
+    for group in patterns.values():
+        group = list(group)
+        n = len(group)
         for i in range(n):
             for j in range(i + 1, n):
-                palabra1 = grupo[i]
-                palabra2 = grupo[j]
-                cuenta1 = contador_palabras[palabra1]
-                cuenta2 = contador_palabras[palabra2]
-                peso = (cuenta1 + cuenta2) / 2
-                G.add_edge(palabra1, palabra2, peso=peso)
+                word1 = group[i]
+                word2 = group[j]
+                count1 = word_counts[word1]
+                count2 = word_counts[word2]
+                weight = (count1 + count2) / 2
+                graph.add_edge(word1, word2, weight=weight)
 
-    return G
+    return graph
 
 
-def visualizar_grafo_con_pesos(G):
+def visualize_graph_with_weights(graph):
     """
-    Visualiza el grafo usando matplotlib, ajustando el grosor de las aristas según su peso.
+    Visualize the graph using matplotlib, adjusting edge thickness based on their weights
+    and node sizes based on their counts.
 
     Args:
-        G (networkx.Graph): El grafo a visualizar.
+        graph (nx.Graph): The graph to visualize.
     """
     plt.figure(figsize=(15, 15))
 
-    # Obtener los pesos de las aristas para ajustar el grosor
-    pesos = [G[u][v]['peso'] for u, v in G.edges()]
+    # Get edge weights
+    weights = [data['weight'] for _, _, data in graph.edges(data=True)]
 
-    # Normalizar los pesos para el grosor de las aristas
-    max_peso = max(pesos) if pesos else 1
-    min_peso = min(pesos) if pesos else 1
-    # Evitar división por cero
-    if max_peso == min_peso:
-        widths = [1 for _ in pesos]
+    # Normalize weights for edge thickness
+    max_weight = max(weights) if weights else 1
+    min_weight = min(weights) if weights else 1
+    if max_weight == min_weight:
+        widths = [1 for _ in weights]
     else:
-        widths = [1 + 4 * ((peso - min_peso) / (max_peso - min_peso)) for peso in pesos]  # Grosor entre 1 y 5
+        widths = [1 + 4 * ((weight - min_weight) / (max_weight - min_weight)) for weight in weights]
 
-    pos = nx.spring_layout(G, k=0.15, iterations=20, seed=42)  # Algoritmo de posicionamiento
+    pos = nx.spring_layout(graph, k=0.15, iterations=20, seed=42)
 
-    # Dibujar nodos
-    nx.draw_networkx_nodes(G, pos, node_size=50, node_color='blue', alpha=0.7)
+    # Get counts for node sizes
+    counts = [graph.nodes[node]['count'] for node in graph.nodes()]
+    max_count = max(counts) if counts else 1
+    min_count = min(counts) if counts else 1
+    if max_count == min_count:
+        sizes = [300 for _ in counts]
+    else:
+        sizes = [
+            300 + 700 * ((count - min_count) / (max_count - min_count)) for count in counts
+        ]
 
-    # Dibujar aristas con grosor basado en el peso
-    nx.draw_networkx_edges(G, pos, width=widths, alpha=0.5)
+    # Draw nodes with sizes
+    nx.draw_networkx_nodes(graph, pos, node_size=sizes, node_color='blue', alpha=0.7)
 
-    # Opcional: Dibujar etiquetas de nodos (puede ser muy denso)
-    # nx.draw_networkx_labels(G, pos, font_size=8)
+    # Draw edges with normalized widths
+    nx.draw_networkx_edges(graph, pos, width=widths, alpha=0.5)
 
-    plt.title("Grafo de Palabras de Tres Letras con Pesos en las Aristas")
+    plt.title("Three-Letter Words Graph with Weighted Edges and Scaled Nodes")
     plt.axis('off')
     plt.show()
 
 
-def visualizar_grafo_con_pesos_mejorado(G):
+def hamming_distance(word1, word2):
     """
-    Visualiza el grafo usando matplotlib, ajustando el grosor de las aristas según su peso y el tamaño de los nodos según su cuenta.
+    Calculate the Hamming distance between two words of equal length.
 
     Args:
-        G (networkx.Graph): El grafo a visualizar.
-    """
-    plt.figure(figsize=(15, 15))
-
-    # Obtener los pesos de las aristas para ajustar el grosor
-    pesos = [G[u][v]['peso'] for u, v in G.edges()]
-
-    # Normalizar los pesos para el grosor de las aristas
-    max_peso = max(pesos) if pesos else 1
-    min_peso = min(pesos) if pesos else 1
-    # Evitar división por cero
-    if max_peso == min_peso:
-        widths = [1 for _ in pesos]
-    else:
-        widths = [1 + 4 * ((peso - min_peso) / (max_peso - min_peso)) for peso in pesos]  # Grosor entre 1 y 5
-
-    pos = nx.spring_layout(G, k=0.15, iterations=20, seed=42)  # Algoritmo de posicionamiento
-
-    # Obtener cuentas para ajustar el tamaño de los nodos
-    cuentas = [G.nodes[n]['cuenta'] for n in G.nodes()]
-    max_cuenta = max(cuentas) if cuentas else 1
-    min_cuenta = min(cuentas) if cuentas else 1
-    # Normalizar cuentas para el tamaño de los nodos
-    if max_cuenta == min_cuenta:
-        tamaños = [300 for _ in cuentas]
-    else:
-        tamaños = [300 + 700 * ((cuenta - min_cuenta) / (max_cuenta - min_cuenta)) for cuenta in
-                   cuentas]  # Tamaño entre 300 y 1000
-
-    # Dibujar nodos
-    nx.draw_networkx_nodes(G, pos, node_size=tamaños, node_color='blue', alpha=0.7)
-
-    # Dibujar aristas con grosor basado en el peso
-    nx.draw_networkx_edges(G, pos, width=widths, alpha=0.5)
-
-    # Opcional: Dibujar etiquetas de nodos (puede ser muy denso)
-    # nx.draw_networkx_labels(G, pos, font_size=8)
-
-    plt.title("Grafo de Palabras de Tres Letras con Pesos en las Aristas")
-    plt.axis('off')
-    plt.show()
-
-
-def hamming_distance(palabra1, palabra2):
-    """
-    Calcula la distancia de Hamming entre dos palabras de igual longitud.
-
-    Args:
-        palabra1 (str): Primera palabra.
-        palabra2 (str): Segunda palabra.
+        word1 (str): First word.
+        word2 (str): Second word.
 
     Returns:
-        int: Número de posiciones en las que las letras difieren.
+        int: Number of positions at which the corresponding letters are different.
     """
-    return sum(c1 != c2 for c1, c2 in zip(palabra1, palabra2))
+    return sum(c1 != c2 for c1, c2 in zip(word1, word2))
 
 
-def calcular_camino_mas_corto(G, palabra_origen, palabra_destino, algoritmo='dijkstra'):
+def calculate_shortest_path(graph, origin, destination, algorithm='dijkstra'):
     """
-    Calcula el camino más corto entre dos palabras en el grafo utilizando Dijkstra o A*.
+    Calculate the shortest path between two words in the graph using Dijkstra or A* algorithm.
 
     Args:
-        G (networkx.Graph): El grafo donde buscar el camino.
-        palabra_origen (str): Palabra de origen.
-        palabra_destino (str): Palabra de destino.
-        algoritmo (str): Algoritmo a usar ('dijkstra' o 'astar').
+        graph (nx.Graph): The graph to search.
+        origin (str): Origin word.
+        destination (str): Destination word.
+        algorithm (str): Algorithm to use ('dijkstra' or 'astar').
 
     Returns:
-        list: Lista de palabras que forman el camino más corto, o None si no existe.
+        list or None: List of words forming the shortest path, or None if no path exists.
     """
-    if palabra_origen not in G.nodes:
-        print(f"Error: La palabra de origen '{palabra_origen}' no está en el grafo.")
+    if origin not in graph.nodes:
+        print(f"Error: The origin word '{origin}' is not in the graph.")
         return None
-    if palabra_destino not in G.nodes:
-        print(f"Error: La palabra de destino '{palabra_destino}' no está en el grafo.")
+    if destination not in graph.nodes:
+        print(f"Error: The destination word '{destination}' is not in the graph.")
         return None
-    if algoritmo not in ['dijkstra', 'astar']:
-        print("Error: El algoritmo debe ser 'dijkstra' o 'astar'.")
+    if algorithm not in ['dijkstra', 'astar']:
+        print("Error: The algorithm must be 'dijkstra' or 'astar'.")
         return None
 
     try:
-        if algoritmo == 'dijkstra':
-            camino = nx.dijkstra_path(G, palabra_origen, palabra_destino, weight='peso')
-        elif algoritmo == 'astar':
-            camino = nx.astar_path(G, palabra_origen, palabra_destino, heuristic=lambda u, v: hamming_distance(u, v),
-                                   weight='peso')
-        return camino
+        if algorithm == 'dijkstra':
+            path = nx.dijkstra_path(graph, origin, destination, weight='weight')
+        elif algorithm == 'astar':
+            path = nx.astar_path(
+                graph,
+                origin,
+                destination,
+                heuristic=lambda u, v: hamming_distance(u, v),
+                weight='weight'
+            )
+        return path
     except nx.NetworkXNoPath:
-        print(f"No existe un camino entre '{palabra_origen}' y '{palabra_destino}'.")
+        print(f"No path exists between '{origin}' and '{destination}'.")
         return None
     except Exception as e:
-        print(f"Error al calcular el camino: {e}")
+        print(f"Error while calculating the path: {e}")
         return None
 
 
-def visualizar_camino(G, camino):
+def visualize_path(graph, path):
     """
-    Visualiza el grafo y resalta el camino especificado.
+    Visualize the graph and highlight the specified path.
 
     Args:
-        G (networkx.Graph): El grafo a visualizar.
-        camino (list): Lista de palabras que forman el camino a resaltar.
+        graph (nx.Graph): The graph to visualize.
+        path (list): List of words forming the path to highlight.
     """
     plt.figure(figsize=(15, 15))
 
-    # Obtener los pesos de las aristas para ajustar el grosor
-    pesos = [G[u][v]['peso'] for u, v in G.edges()]
+    # Get edge weights
+    weights = [data['weight'] for _, _, data in graph.edges(data=True)]
 
-    # Normalizar los pesos para el grosor de las aristas
-    max_peso = max(pesos) if pesos else 1
-    min_peso = min(pesos) if pesos else 1
-    # Evitar división por cero
-    if max_peso == min_peso:
-        widths = [1 for _ in pesos]
+    # Normalize weights for edge thickness
+    max_weight = max(weights) if weights else 1
+    min_weight = min(weights) if weights else 1
+    if max_weight == min_weight:
+        widths = [1 for _ in weights]
     else:
-        widths = [1 + 4 * ((peso - min_peso) / (max_peso - min_peso)) for peso in pesos]  # Grosor entre 1 y 5
+        widths = [1 + 4 * ((weight - min_weight) / (max_weight - min_weight)) for weight in weights]
 
-    pos = nx.spring_layout(G, k=0.15, iterations=20, seed=42)  # Algoritmo de posicionamiento
+    pos = nx.spring_layout(graph, k=0.15, iterations=20, seed=42)
 
-    # Dibujar nodos
-    nx.draw_networkx_nodes(G, pos, node_size=50, node_color='blue', alpha=0.7)
+    # Draw all nodes
+    nx.draw_networkx_nodes(graph, pos, node_size=50, node_color='blue', alpha=0.7)
 
-    # Dibujar aristas con grosor basado en el peso
-    nx.draw_networkx_edges(G, pos, width=widths, alpha=0.3)
+    # Draw all edges with normalized widths
+    nx.draw_networkx_edges(graph, pos, width=widths, alpha=0.3)
 
-    # Resaltar el camino
-    if camino:
-        # Crear una lista de aristas en el camino
-        camino_aristas = list(zip(camino, camino[1:]))
-        # Dibujar las aristas del camino con mayor grosor y color rojo
-        nx.draw_networkx_edges(G, pos, edgelist=camino_aristas, width=4, edge_color='red')
-        # Dibujar los nodos del camino con un color diferente
-        nx.draw_networkx_nodes(G, pos, nodelist=camino, node_size=100, node_color='red', alpha=0.9)
+    # Highlight the path if it exists
+    if path:
+        # Create a list of edges in the path
+        path_edges = list(zip(path, path[1:]))
+        # Draw path edges with higher thickness and red color
+        nx.draw_networkx_edges(
+            graph,
+            pos,
+            edgelist=path_edges,
+            width=4,
+            edge_color='red'
+        )
+        # Draw path nodes with larger size and red color
+        nx.draw_networkx_nodes(
+            graph,
+            pos,
+            nodelist=path,
+            node_size=100,
+            node_color='red',
+            alpha=0.9
+        )
 
-    # Opcional: Dibujar etiquetas de nodos (puede ser muy denso)
-    # nx.draw_networkx_labels(G, pos, font_size=8)
-
-    plt.title("Grafo de Palabras de Tres Letras con Camino Resaltado")
+    plt.title("Three-Letter Words Graph with Highlighted Path")
     plt.axis('off')
     plt.show()
 
 
 def main():
-    # Uso del script
+    """
+    Main function to execute the script.
+    """
+    # Specify the path to the text file
     filename = r'C:\Users\gerar\OneDrive\Escritorio\Cuarto\TSCD\GraphWord\Datalake\pg74507.txt'
 
-    # Opcional: Imprimir el directorio actual para verificar rutas relativas
-    print(f"Directorio actual: {os.getcwd()}")
+    # Optionally, print the current directory to verify relative paths
+    print(f"Current directory: {os.getcwd()}")
 
-    # Obtener el contador de palabras de tres letras
-    contador_palabras = obtener_vocabulario_con_cuentas(filename, eliminar_stopwords=True)
+    # Extract the three-letter words vocabulary
+    word_counts = extract_vocabulary(filename, remove_stopwords=True)
 
-    if contador_palabras:
-        print(f"\nTotal de palabras de tres letras (únicas): {len(contador_palabras)}")
-        print("Algunas palabras de tres letras y sus cuentas:")
-        for palabra, cuenta in list(contador_palabras.items())[:10]:
-            print(f"{palabra}: {cuenta}")
+    if word_counts:
+        print(f"\nTotal unique three-letter words: {len(word_counts)}")
+        print("Sample three-letter words and their counts:")
+        for word, count in list(word_counts.items())[:10]:
+            print(f"{word}: {count}")
 
-        # Construir el grafo con pesos (elige una de las dos funciones)
-        # G = construir_grafo_con_pesos(contador_palabras)  # Método no optimizado
-        G = construir_grafo_con_pesos_optimizado(contador_palabras)  # Método optimizado
-        print(f"\nTotal de nodos en el grafo: {G.number_of_nodes()}")
-        print(f"Total de aristas en el grafo: {G.number_of_edges()}")
+        # Build the graph using the optimized method
+        graph = build_weight_graph(word_counts)
+        print(f"\nTotal nodes in the graph: {graph.number_of_nodes()}")
+        print(f"Total edges in the graph: {graph.number_of_edges()}")
 
-        # Opcional: Imprimir algunas aristas con sus pesos
-        print("\nAlgunas aristas con sus pesos:")
-        for u, v, data in list(G.edges(data=True))[:10]:
-            print(f"{u} - {v}: Peso = {data['peso']}")
+        # Optionally, print some edges with their weights
+        print("\nSample edges with weights:")
+        for u, v, data in list(graph.edges(data=True))[:10]:
+            print(f"{u} - {v}: Weight = {data['weight']}")
 
-        # Visualizar el grafo
-        # visualizar_grafo_con_pesos(G)  # Método de visualización básico
-        visualizar_grafo_con_pesos_mejorado(G)  # Método de visualización mejorado
+        # Visualize the graph with improved visualization
+        visualize_graph_with_weights(graph)
 
-        # Solicitar al usuario las palabras de origen y destino
+        # Interactive loop for finding the shortest paths
         while True:
-            print("\n--- Cálculo del Camino Más Corto ---")
-            palabra_origen = input("Ingrese la palabra de origen (o 'salir' para terminar): ").lower()
-            if palabra_origen == 'salir':
+            print("\n--- Shortest Path Calculation ---")
+            origin = input("Enter the origin word (or 'exit' to quit): ").lower()
+            if origin == 'exit':
                 break
-            palabra_destino = input("Ingrese la palabra de destino (o 'salir' para terminar): ").lower()
-            if palabra_destino == 'salir':
+            destination = input("Enter the destination word (or 'exit' to quit): ").lower()
+            if destination == 'exit':
                 break
-            algoritmo = input("Seleccione el algoritmo ('dijkstra' o 'astar'): ").lower()
-            if algoritmo not in ['dijkstra', 'astar']:
-                print("Algoritmo no válido. Por favor, elija 'dijkstra' o 'astar'.")
+            algorithm = input("Select the algorithm ('dijkstra' or 'astar'): ").lower()
+            if algorithm not in ['dijkstra', 'astar']:
+                print("Invalid algorithm. Please choose 'dijkstra' or 'astar'.")
                 continue
 
-            # Calcular el camino más corto
-            camino = calcular_camino_mas_corto(G, palabra_origen, palabra_destino, algoritmo=algoritmo)
+            # Calculate the shortest path
+            path = calculate_shortest_path(graph, origin, destination, algorithm=algorithm)
 
-            if camino:
+            if path:
                 print(
-                    f"\nCamino más corto entre '{palabra_origen}' y '{palabra_destino}' usando {algoritmo.capitalize()}:")
-                print(" -> ".join(camino))
+                    f"\nShortest path between '{origin}' and '{destination}' using {algorithm.capitalize()}:")
+                print(" -> ".join(path))
 
-                # Visualizar el camino en el grafo
-                visualizar_camino(G, camino)
+                # Visualize the path on the graph
+                visualize_path(graph, path)
             else:
-                print("No se pudo encontrar un camino entre las palabras especificadas.")
+                print("Could not find a path between the specified words.")
     else:
-        print("No se pudo obtener el vocabulario debido a un error anterior.")
+        print("Failed to extract vocabulary due to a previous error.")
 
 
 if __name__ == "__main__":
