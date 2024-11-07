@@ -7,7 +7,6 @@ from nltk.corpus import stopwords
 import networkx as nx
 import matplotlib.pyplot as plt
 
-# Download necessary NLTK resources (only the first time)
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
 
@@ -273,7 +272,7 @@ def main():
     Main function to execute the script.
     """
     # Specify the path to the text file
-    filename = r'C:\Users\gerar\OneDrive\Escritorio\Cuarto\TSCD\GraphWord\Datalake\pg74507.txt'
+    filename = r'pg74507.txt'
 
     # Optionally, print the current directory to verify relative paths
     print(f"Current directory: {os.getcwd()}")
