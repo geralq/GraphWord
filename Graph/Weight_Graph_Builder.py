@@ -21,12 +21,12 @@ class Weight_Graph_Builder(Graph_Builder):
         graph = nx.Graph()
 
         # Add nodes with occurrence attribute
-        for word, count in word_counts.items():
+        for word, count in word_count.items():
             graph.add_node(word, count=count)
 
         # Create a dictionary to group words by patterns with one letter replaced by '_'
         patterns = {}
-        for word in word_counts:
+        for word in word_count:
             for i in range(3):
                 pattern = word[:i] + '_' + word[i + 1:]
                 patterns.setdefault(pattern, set()).add(word)
@@ -39,8 +39,8 @@ class Weight_Graph_Builder(Graph_Builder):
                 for j in range(i + 1, n):
                     word1 = group[i]
                     word2 = group[j]
-                    count1 = word_counts[word1]
-                    count2 = word_counts[word2]
+                    count1 = word_count[word1]
+                    count2 = word_count[word2]
                     weight = (count1 + count2) / 2
                     graph.add_edge(word1, word2, weight=weight)
 
