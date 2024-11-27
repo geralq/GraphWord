@@ -49,7 +49,7 @@ class TextAnalyzer:
         This is a private function and should not be called directly outside the class.
 
         Args:
-            text (str, optional): Text to clean. If not provided, the loaded text will be cleaned.
+            text (str, optional): text to clean. If not provided, the loaded text will be cleaned.
 
         Returns:
             str: Cleaned text.
