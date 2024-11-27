@@ -9,7 +9,7 @@ def visualize_graph_with_weights(graph):
     and node sizes based on their counts.
 
     Args:
-        graph (nx.Graph): The graph to visualize.
+        graph (nx.graph): The graph to visualize.
     """
     plt.figure(figsize=(15, 15))
 
@@ -43,7 +43,7 @@ def visualize_graph_with_weights(graph):
     # Draw edges with normalized widths
     nx.draw_networkx_edges(graph, pos, width=widths, alpha=0.5)
 
-    plt.title("Three-Letter Words Graph with Weighted Edges and Scaled Nodes")
+    plt.title("Three-Letter Words graph with Weighted Edges and Scaled Nodes")
     plt.axis('off')
     plt.show()
 
@@ -53,7 +53,7 @@ def visualize_path(graph, path):
     Visualize the graph and highlight the specified path.
 
     Args:
-        graph (nx.Graph): The graph to visualize.
+        graph (nx.graph): The graph to visualize.
         path (list): List of words forming the path to highlight.
     """
     plt.figure(figsize=(15, 15))
@@ -99,7 +99,7 @@ def visualize_path(graph, path):
             alpha=0.9
         )
 
-    plt.title("Three-Letter Words Graph with Highlighted Path")
+    plt.title("Three-Letter Words graph with Highlighted Path")
     plt.axis('off')
     plt.show()
 

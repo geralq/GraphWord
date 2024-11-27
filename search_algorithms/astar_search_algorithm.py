@@ -1,7 +1,7 @@
-from SearchAlgorithm import SearchAlgorithm
+from search_algorithm import SearchAlgorithm
 
 
-class Astar_SearchAlgorithm(SearchAlgorithm):
+class AstarSearchAlgorithm(SearchAlgorithm):
     def search(self, start, goal, graph):
         if start not in graph.nodes:
             print(f"Error: The start word '{start}' is not in the graph.")

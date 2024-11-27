@@ -1,8 +1,8 @@
-from Graph_Builder import Graph_Builder
+from graph_builder import GraphBuilder
 import networkx as nx
 
 
-class Weight_Graph_Builder(Graph_Builder):
+class WeightGraphBuilder(GraphBuilder):
 
     def build_graph(self, word_count):
         """
